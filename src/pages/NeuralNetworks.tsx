@@ -1,12 +1,6 @@
 // src/pages/NeuralNetworks.tsx
 import { useState, useRef, useEffect, useCallback } from "react";
-
-/**
- * Neural Network XOR Visualizer
- * - Trains a small feedforward neural network to learn XOR
- * - Visualizes neurons, connections, activations, and weights
- * - Includes explanation + test + training panels
- */
+import { useTheme } from "../context/ThemeContext";
 
 type Example = { inputs: [number, number]; target: number };
 const XOR_DATA: Example[] = [
@@ -16,8 +10,8 @@ const XOR_DATA: Example[] = [
     { inputs: [1, 1], target: 0 },
 ];
 
-const WIDTH = 380;
-const HEIGHT = 260;
+const WIDTH = 420;
+const HEIGHT = 300;
 
 /** Helpers */
 const rand = (a = -1, b = 1) => Math.random() * (b - a) + a;
@@ -25,6 +19,7 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 const clamp255 = (v: number) => Math.max(0, Math.min(255, Math.floor(v)));
 
 export default function NeuralNetworks() {
+    const { theme } = useTheme();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // initialize with sane default so render won't crash
@@ -48,8 +43,6 @@ export default function NeuralNetworks() {
     const [currentExample, setCurrentExample] = useState<Example>(XOR_DATA[0]);
 
     useEffect(() => {
-        // ensure network is seeded on mount (already seeded above)
-        // but keep this to reset visuals if needed
         setHiddenOutputs([0.5, 0.5, 0.5, 0.5]);
         setOutput(0.5);
     }, []);
@@ -59,14 +52,12 @@ export default function NeuralNetworks() {
 
     const forward = useCallback(
         (inputs: number[]) => {
-            // safe guards in case weights not set yet
             const w0 = weights[0] ?? Array(8).fill(0);
             const w1 = weights[1] ?? Array(4).fill(0);
             const b = biases ?? Array(5).fill(0);
 
             const hidden: number[] = [];
             for (let i = 0; i < 4; i++) {
-                // each hidden neuron uses two weights (for 2 inputs) + bias
                 const w_ix = (j: number) => w0[i * 2 + j] ?? 0;
                 const z = w_ix(0) * inputs[0] + w_ix(1) * inputs[1] + (b[i] ?? 0);
                 hidden.push(sigmoid(z));
@@ -92,9 +83,7 @@ export default function NeuralNetworks() {
         const outputError = target - out;
         const outputDelta = outputError * sigmoidDerivative(out);
 
-        // Use existing weights safely
         const w1 = weights[1] ?? Array(4).fill(0);
-
         const hiddenDeltas = hidden.map((h, i) => sigmoidDerivative(h) * outputDelta * (w1[i] ?? 0));
 
         const newW1 = [...(weights[1] ?? Array(4).fill(0))];
@@ -145,15 +134,18 @@ export default function NeuralNetworks() {
         const ctx = canvas?.getContext("2d", { willReadFrequently: true }) ?? null;
         if (!ctx || !canvas) return;
 
-        ctx.clearRect(0, 0, WIDTH, HEIGHT);
-        const neuronRadius = 18;
+        // Clear canvas with theme-appropriate background
+        ctx.fillStyle = theme === "dark" ? "#1f2937" : "#f9fafb";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        const neuronRadius = 20;
 
         const inputPos = [
-            { x: 60, y: 100 },
-            { x: 60, y: 160 },
+            { x: 80, y: 120 },
+            { x: 80, y: 180 },
         ];
-        const hiddenPos = [0, 1, 2, 3].map((i) => ({ x: 190, y: 60 + i * 50 }));
-        const outputPos = [{ x: 320, y: 130 }];
+        const hiddenPos = [0, 1, 2, 3].map((i) => ({ x: 210, y: 80 + i * 50 }));
+        const outputPos = [{ x: 340, y: 150 }];
 
         const w0 = weights[0] ?? Array(8).fill(0);
         const w1 = weights[1] ?? Array(4).fill(0);
@@ -165,8 +157,10 @@ export default function NeuralNetworks() {
                 ctx.beginPath();
                 ctx.moveTo(inp.x + neuronRadius, inp.y);
                 ctx.lineTo(hid.x - neuronRadius, hid.y);
-                ctx.strokeStyle = w >= 0 ? "rgba(16,185,129,0.7)" : "rgba(239,68,68,0.7)";
-                ctx.lineWidth = Math.min(4, Math.abs(w) * 2 + 0.5);
+                ctx.strokeStyle = w >= 0 ?
+                    (theme === "dark" ? "rgba(34,197,94,0.8)" : "rgba(22,163,74,0.8)") :
+                    (theme === "dark" ? "rgba(239,68,68,0.8)" : "rgba(220,38,38,0.8)");
+                ctx.lineWidth = Math.min(5, Math.abs(w) * 3 + 1);
                 ctx.stroke();
             });
         });
@@ -177,139 +171,353 @@ export default function NeuralNetworks() {
             ctx.beginPath();
             ctx.moveTo(hid.x + neuronRadius, hid.y);
             ctx.lineTo(outputPos[0].x - neuronRadius, outputPos[0].y);
-            ctx.strokeStyle = w >= 0 ? "rgba(16,185,129,0.7)" : "rgba(239,68,68,0.7)";
-            ctx.lineWidth = Math.min(4, Math.abs(w) * 2 + 0.5);
+            ctx.strokeStyle = w >= 0 ?
+                (theme === "dark" ? "rgba(34,197,94,0.8)" : "rgba(22,163,74,0.8)") :
+                (theme === "dark" ? "rgba(239,68,68,0.8)" : "rgba(220,38,38,0.8)");
+            ctx.lineWidth = Math.min(5, Math.abs(w) * 3 + 1);
             ctx.stroke();
         });
 
         // Draw neurons
         const drawNeuron = (x: number, y: number, act: number, label?: string) => {
-            const a = clamp01(act); // clamp to 0..1 for color mapping
+            const a = clamp01(act);
             ctx.beginPath();
             ctx.arc(x, y, neuronRadius, 0, 2 * Math.PI);
-            const val = clamp255(a * 255);
-            ctx.fillStyle = `rgba(${val},${val},255,0.8)`;
+
+            // Theme-aware neuron colors
+            if (theme === "dark") {
+                const val = clamp255(a * 200 + 55); // Brighter in dark mode
+                ctx.fillStyle = `rgba(${val}, ${val}, 255, 0.9)`;
+            } else {
+                const val = clamp255(a * 200 + 55);
+                ctx.fillStyle = `rgba(${val}, ${val}, 255, 0.8)`;
+            }
+
             ctx.fill();
-            ctx.strokeStyle = "#4B5563";
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = theme === "dark" ? "#4b5563" : "#374151";
+            ctx.lineWidth = 2;
             ctx.stroke();
-            ctx.fillStyle = "#111827";
-            ctx.font = "10px sans-serif";
+
+            // Text color based on theme
+            ctx.fillStyle = theme === "dark" ? "#f9fafb" : "#111827";
+            ctx.font = "12px system-ui, -apple-system, sans-serif";
             ctx.textAlign = "center";
-            ctx.fillText(label ?? act.toFixed(2), x, y + 3);
+            ctx.textBaseline = "middle";
+            ctx.fillText(label ?? act.toFixed(2), x, y);
         };
 
-        // inputs (use precise numbers as labels)
+        // Draw layer labels
+        ctx.fillStyle = theme === "dark" ? "#9ca3af" : "#6b7280";
+        ctx.font = "14px system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Input Layer", 80, 220);
+        ctx.fillText("Hidden Layer", 210, 280);
+        ctx.fillText("Output Layer", 340, 220);
+
+        // inputs
         inputPos.forEach((p, i) =>
             drawNeuron(p.x, p.y, currentExample.inputs[i], currentExample.inputs[i].toString())
         );
 
-        // hidden (use last computed hiddenOutputs or default 0.5)
+        // hidden
         hiddenPos.forEach((p, i) => drawNeuron(p.x, p.y, hiddenOutputs[i] ?? 0.5));
 
         // output
         drawNeuron(outputPos[0].x, outputPos[0].y, output ?? 0.5, (output ?? 0.5).toFixed(2));
-    }, [weights, hiddenOutputs, output, currentExample]);
+    }, [weights, hiddenOutputs, output, currentExample, theme]);
 
     useEffect(() => {
         drawNetwork();
     }, [drawNetwork]);
 
     return (
-        <div className="w-full px-6 py-8 text-gray-800 dark:text-gray-100">
-            <h1 className="text-2xl font-semibold mb-4">Neural Network Learning XOR</h1>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="p-4 border dark:border-gray-700 rounded-lg">
-                    <h2 className="font-medium mb-2 text-center">Neural Network Visualization</h2>
-                    <canvas
-                        ref={canvasRef}
-                        width={WIDTH}
-                        height={HEIGHT}
-                        className="mx-auto bg-white dark:bg-gray-800 rounded"
-                    />
+        <div className={`min-h-screen pt-20 pb-12 transition-all duration-500 ${theme === "dark"
+                ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-gray-100"
+                : "bg-gradient-to-br from-blue-50 via-white to-indigo-50 text-gray-900"
+            }`}>
+            <div className="max-w-7xl mx-auto px-6">
+                {/* Header */}
+                <div className="text-center mb-12">
+                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+                        Neural Network Learning XOR
+                    </h1>
+                    <p className={`text-lg max-w-2xl mx-auto ${theme === "dark" ? "text-gray-300" : "text-gray-600"
+                        }`}>
+                        Visualizing how neural networks learn the XOR function through forward propagation and backpropagation
+                    </p>
                 </div>
 
-                <div className="p-4 border dark:border-gray-700 rounded-lg space-y-2">
-                    <h2 className="font-medium text-center">Training Stats</h2>
-                    <p>
-                        Epochs: <b>{epoch}</b>
-                    </p>
-                    <p>
-                        Current Error: <b>{error.toFixed(4)}</b>
-                    </p>
-                    <p>
-                        Current Example: [{currentExample.inputs.join(", ")}] → {currentExample.target}
-                    </p>
-                    <p>
-                        Prediction: <b>{output.toFixed(4)}</b>
-                    </p>
-                    <p>Status: {running ? "Training..." : "Stopped"}</p>
-                    <label className="block text-sm">Training Speed</label>
-                    <input
-                        type="range"
-                        min="10"
-                        max="190"
-                        value={speed}
-                        onChange={(e) => setSpeed(parseInt(e.target.value))}
-                        className="w-full"
-                    />
-                    <div className="flex justify-center gap-4 mt-2">
-                        {running ? (
-                            <button onClick={() => setRunning(false)} className="bg-red-500 px-4 py-1 rounded text-white">
-                                Stop Training
-                            </button>
-                        ) : (
-                            <button onClick={() => setRunning(true)} className="bg-green-600 px-4 py-1 rounded text-white">
-                                Start Training
-                            </button>
-                        )}
-                        <button onClick={resetNetwork} className="bg-gray-600 px-4 py-1 rounded text-white">
-                            Reset
-                        </button>
+                {/* Main Content Grid */}
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-12">
+                    {/* Neural Network Visualization */}
+                    <div className="xl:col-span-2">
+                        <div className={`p-6 rounded-2xl shadow-2xl border ${theme === "dark"
+                                ? "bg-gray-800 border-gray-700"
+                                : "bg-white border-gray-200"
+                            }`}>
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-2xl font-bold">Neural Network Visualization</h2>
+                                <div className="flex items-center space-x-4 text-sm">
+                                    <div className="flex items-center">
+                                        <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                                        <span>Positive Weight</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                                        <span>Negative Weight</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <canvas
+                                ref={canvasRef}
+                                width={WIDTH}
+                                height={HEIGHT}
+                                className={`w-full rounded-lg border-2 ${theme === "dark" ? "border-gray-600" : "border-gray-300"
+                                    }`}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Training Controls & Stats */}
+                    <div className={`p-6 rounded-2xl shadow-2xl border ${theme === "dark"
+                            ? "bg-gray-800 border-gray-700"
+                            : "bg-white border-gray-200"
+                        }`}>
+                        <h2 className="text-2xl font-bold mb-6">Training Dashboard</h2>
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div className={`p-4 rounded-xl ${theme === "dark" ? "bg-gray-700" : "bg-blue-50"
+                                }`}>
+                                <div className="text-sm opacity-75">Epochs</div>
+                                <div className="text-2xl font-bold text-blue-500">{epoch.toLocaleString()}</div>
+                            </div>
+                            <div className={`p-4 rounded-xl ${theme === "dark" ? "bg-gray-700" : "bg-red-50"
+                                }`}>
+                                <div className="text-sm opacity-75">Current Error</div>
+                                <div className="text-2xl font-bold text-red-500">{error.toFixed(4)}</div>
+                            </div>
+                            <div className={`p-4 rounded-xl ${theme === "dark" ? "bg-gray-700" : "bg-green-50"
+                                }`}>
+                                <div className="text-sm opacity-75">Prediction</div>
+                                <div className="text-2xl font-bold text-green-500">{output.toFixed(4)}</div>
+                            </div>
+                            <div className={`p-4 rounded-xl ${theme === "dark" ? "bg-gray-700" : "bg-purple-50"
+                                }`}>
+                                <div className="text-sm opacity-75">Status</div>
+                                <div className={`text-lg font-bold ${running ? 'text-green-500' : 'text-yellow-500'
+                                    }`}>
+                                    {running ? 'Training' : 'Paused'}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Current Example */}
+                        <div className={`p-4 rounded-xl mb-6 ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                            }`}>
+                            <div className="text-sm opacity-75 mb-2">Current Example</div>
+                            <div className="font-mono text-lg">
+                                [{currentExample.inputs.join(", ")}] → {currentExample.target}
+                            </div>
+                        </div>
+
+                        {/* Controls */}
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium mb-2">
+                                    Training Speed: <span className="text-blue-500">{speed}</span>
+                                </label>
+                                <input
+                                    type="range"
+                                    min="10"
+                                    max="190"
+                                    value={speed}
+                                    onChange={(e) => setSpeed(parseInt(e.target.value))}
+                                    className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"
+                                        }`}
+                                />
+                            </div>
+
+                            <div className="flex gap-3">
+                                {running ? (
+                                    <button
+                                        onClick={() => setRunning(false)}
+                                        className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+                                    >
+                                        ⏸️ Stop Training
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => setRunning(true)}
+                                        className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+                                    >
+                                        ▶️ Start Training
+                                    </button>
+                                )}
+                                <button
+                                    onClick={resetNetwork}
+                                    className={`py-3 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl ${theme === "dark"
+                                            ? "bg-gray-700 hover:bg-gray-600 text-white"
+                                            : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+                                        }`}
+                                >
+                                    🔄 Reset
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="mt-8 text-center">
-                <h3 className="font-semibold mb-2">Test Network</h3>
-                <div className="flex justify-center gap-4 flex-wrap">
-                    {XOR_DATA.map((ex, i) => {
-                        const { out } = forward(ex.inputs);
-                        return (
-                            <div
-                                key={i}
-                                className="border dark:border-gray-700 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
-                            >
-                                [{ex.inputs.join(", ")}] → {ex.target} <br />
-                                <span className="text-sm">Prediction: {out.toFixed(4)}</span>
-                            </div>
-                        );
-                    })}
+                {/* Test Network Section */}
+                <div className={`p-8 rounded-2xl shadow-2xl border mb-12 ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700"
+                        : "bg-white border-gray-200"
+                    }`}>
+                    <h3 className="text-2xl font-bold mb-6">Test Network Performance</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {XOR_DATA.map((ex, i) => {
+                            const { out } = forward(ex.inputs);
+                            const isCorrect = Math.abs(out - ex.target) < 0.5;
+                            return (
+                                <div
+                                    key={i}
+                                    className={`p-4 rounded-xl border-2 transition-all ${isCorrect
+                                            ? (theme === "dark"
+                                                ? "border-green-500 bg-green-900/20"
+                                                : "border-green-500 bg-green-50")
+                                            : (theme === "dark"
+                                            ? "border-green-500 bg-green-900/20"
+                                            : "order-green-500 bg-green-50")
+                                        } ${JSON.stringify(ex.inputs) === JSON.stringify(currentExample.inputs)
+                                        ? 'border-green-500 bg-green-900/20'
+                                            : ''
+                                        }`}
+                                >
+                                    <div className="font-mono text-center mb-2">
+                                        <div className="text-lg font-bold">[{ex.inputs.join(", ")}]</div>
+                                        <div className="text-sm opacity-75">→ {ex.target}</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-sm opacity-75">Prediction</div>
+                                        <div className="font-bold text-lg">{out.toFixed(4)}</div>
+                                        
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
-            </div>
 
-            <div className="mt-12 space-y-6 max-w-3xl mx-auto">
-                <section>
-                    <h3 className="text-xl font-semibold mb-2">How Neural Networks Work</h3>
-                    <p>
-                        The XOR (exclusive OR) function outputs 1 when exactly one of its inputs is 1. XOR is not linearly separable — a single neuron can’t solve it. We need at least one hidden layer.
-                    </p>
-                </section>
-                <section>
-                    <h4 className="font-semibold mt-4">Network Architecture</h4>
-                    <ul className="list-disc ml-6">
-                        <li>Input Layer: 2 neurons (binary inputs)</li>
-                        <li>Hidden Layer: 4 neurons (sigmoid)</li>
-                        <li>Output Layer: 1 neuron (sigmoid)</li>
-                    </ul>
-                </section>
-                <section>
-                    <h4 className="font-semibold mt-4">Forward Pass & Backpropagation</h4>
-                    <p className="text-sm leading-relaxed">
-                        Forward pass computes activations layer by layer. Backpropagation adjusts weights using the error derivative to minimize prediction error.
-                    </p>
-                </section>
+                {/* Educational Content */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Left Column */}
+                    <div className="space-y-8">
+                        <section className={`p-6 rounded-2xl shadow-lg border ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+                            }`}>
+                            <h3 className="text-xl font-bold mb-4">The XOR Problem</h3>
+                            <p className="mb-4">
+                                The XOR (exclusive OR) function outputs 1 when exactly one of its inputs is 1, and 0 otherwise.
+                            </p>
+                            <div className={`overflow-hidden rounded-lg border ${theme === "dark" ? "border-gray-600" : "border-gray-300"
+                                }`}>
+                                <table className="w-full">
+                                    <thead className={theme === "dark" ? "bg-gray-700" : "bg-gray-100"}>
+                                        <tr>
+                                            <th className="p-3 font-semibold">Input 1</th>
+                                            <th className="p-3 font-semibold">Input 2</th>
+                                            <th className="p-3 font-semibold">XOR Output</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {XOR_DATA.map((row, i) => (
+                                            <tr key={i} className={
+                                                theme === "dark"
+                                                    ? "border-t border-gray-600 even:bg-gray-700/50"
+                                                    : "border-t border-gray-200 even:bg-gray-50"
+                                            }>
+                                                <td className="p-3 text-center">{row.inputs[0]}</td>
+                                                <td className="p-3 text-center">{row.inputs[1]}</td>
+                                                <td className="p-3 text-center font-bold">{row.target}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p className="mt-4 text-sm opacity-75">
+                                XOR is not linearly separable, requiring at least one hidden layer for a neural network to learn it.
+                            </p>
+                        </section>
+
+                        <section className={`p-6 rounded-2xl shadow-lg border ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+                            }`}>
+                            <h3 className="text-xl font-bold mb-4">Network Architecture</h3>
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between p-3 rounded-lg bg-blue-500/10">
+                                    <span>Input Layer</span>
+                                    <span className="font-bold">2 neurons</span>
+                                </div>
+                                <div className="flex items-center justify-between p-3 rounded-lg bg-purple-500/10">
+                                    <span>Hidden Layer</span>
+                                    <span className="font-bold">4 neurons</span>
+                                </div>
+                                <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10">
+                                    <span>Output Layer</span>
+                                    <span className="font-bold">1 neuron</span>
+                                </div>
+                            </div>
+                            <p className="mt-4 text-sm">
+                                Each connection has a weight, and each neuron (except inputs) has a bias term.
+                            </p>
+                        </section>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="space-y-8">
+                        <section className={`p-6 rounded-2xl shadow-lg border ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+                            }`}>
+                            <h3 className="text-xl font-bold mb-4">Training Process</h3>
+                            <ol className="space-y-3">
+                                {[
+                                    "Initialize weights and biases randomly (between -1 and 1)",
+                                    "For each training example: Forward pass → Calculate error → Backpropagation",
+                                    "One complete pass through all examples = 1 epoch",
+                                    "Continue until average error < 0.05"
+                                ].map((step, i) => (
+                                    <li key={i} className="flex items-start">
+                                        <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold mr-3 ${theme === "dark" ? "bg-blue-600" : "bg-blue-500 text-white"
+                                            }`}>
+                                            {i + 1}
+                                        </span>
+                                        <span>{step}</span>
+                                    </li>
+                                ))}
+                            </ol>
+                        </section>
+
+                        <section className={`p-6 rounded-2xl shadow-lg border ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+                            }`}>
+                            <h3 className="text-xl font-bold mb-4">Visualization Guide</h3>
+                            <div className="space-y-3">
+                                <div className="flex items-center">
+                                    <div className="w-4 h-4 bg-blue-400 rounded-full mr-3"></div>
+                                    <span>Neuron brightness = activation level (0-1)</span>
+                                </div>
+                                <div className="flex items-center">
+                                    <div className="w-4 h-0.5 bg-green-500 mr-3"></div>
+                                    <span>Green lines = positive weights</span>
+                                </div>
+                                <div className="flex items-center">
+                                    <div className="w-4 h-0.5 bg-red-500 mr-3"></div>
+                                    <span>Red lines = negative weights</span>
+                                </div>
+                                <div className="flex items-center">
+                                    <div className="w-4 h-0.5 bg-gray-500 mr-3"></div>
+                                    <span>Line thickness = weight magnitude</span>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
             </div>
         </div>
     );
