@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "../context/ThemeContext";
 /**
  * Canvas Linear Regression Visualiser
@@ -154,7 +154,7 @@ export default function LinearRegression() {
 
         // draw residual dashed lines if enabled
         if (showResiduals) {
-            points.forEach((p, i) => {
+            points.forEach((p) => {
                 const predictedY = currentM * p.x + currentB;
                 const { px: px1, py: py1 } = dataToPixel(p.x, p.y, width, height);
                 const { px: px2, py: py2 } = dataToPixel(p.x, predictedY, width, height);
@@ -167,6 +167,7 @@ export default function LinearRegression() {
                 ctx.stroke();
                 ctx.setLineDash([]);
             });
+
         }
 
         // draw regression line (red) across domain
@@ -462,7 +463,7 @@ export default function LinearRegression() {
         <div className={`p-6 space-y-6 ${theme === "dark" ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
 
         
-            <h1 className="text-2xl font-bold">Animated Linear Regression</h1>
+            <h1 className="text-2xl font-bold mt-14 text-center">Animated Linear Regression</h1>
 
             <div className="grid md:grid-cols-3 gap-6">
                 {/* Left Chart */}
@@ -471,20 +472,8 @@ export default function LinearRegression() {
                     <div className="flex justify-between items-start mb-2">
                         <div>
                             <h2 className="text-lg font-semibold">Regression Equation</h2>
-                            <div className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                                y ={" "}
-                                <span className={`${theme === "dark" ? "text-red-400" : "text-red-600"} font-medium`}>
-                                    {currentM.toFixed(4)}
-                                </span>{" "}
-                                × x +{" "}
-                                <span className={`${theme === "dark" ? "text-red-400" : "text-red-600"} font-medium`}>
-                                    {currentB.toFixed(4)}
-                                </span>
-                            </div>
+                            
 
-                            <div className={`text-xs mt-1 ${theme === "dark" ? "text-white" : "text-gray-500"}`}>
-                                Total Error (Sum of Squared Residuals): {totalError.toFixed(4)}
-                            </div>
 
                         </div>
 
