@@ -1,16 +1,13 @@
-
-import { Route, Routes } from 'react-router-dom'
-import Footer from './components/Footer'
-import Navbar from './components/Navbar'
-import About from './pages/About'
-import CNNVisualizer from './pages/CNNVisualizer'
-import Compare from './pages/Compare.tsx';
-
-import DecisionBoundaries from './pages/DecisionBoundaries'
-import Home from './pages/Home'
-import LinearRegression from './pages/LinearRegression'
-import NeuralNetworks from './pages/NeuralNetworks'
-
+import { Route, Routes } from 'react-router-dom';
+import Footer from './components/Footer';
+import Navbar from './components/Navbar';
+import About from './pages/About';
+import CNNVisualizer from './pages/CNNVisualizer';
+import Compare from './pages/Compare';
+import DecisionBoundaries from './pages/DecisionBoundaries';
+import Home from './pages/Home';
+import LinearRegression from './pages/LinearRegression';
+import NeuralNetworks from './pages/NeuralNetworks';
 
 export default function App() {
   return (
@@ -29,5 +26,5 @@ export default function App() {
       </main>
       <Footer />
     </div>
-  )
+  );
 }
