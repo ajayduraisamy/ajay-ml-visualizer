@@ -470,7 +470,7 @@ export default function LinearRegression() {
     };
 
     return (
-        <div className={`p-6 space-y-6 ${theme === "dark" ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+        <div className={`p-6 space-y-6 mt-10 ${theme === "dark" ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
             <h1 className={`text-2xl font-bold max-w-4xl mx-auto leading-relaxed ${theme === "dark"
                 ? "text-white/70 bg-gradient-to-r from-white/5 to-transparent p-8 rounded-3xl border border-white/10"
                 : "text-black/70 bg-gradient-to-r from-black/5 to-transparent p-8 rounded-3xl border border-black/10"
