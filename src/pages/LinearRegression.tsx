@@ -23,7 +23,6 @@ function calcRegression(points: Point[]) {
     return { m, b, error };
 }
 
-
 function generateRandomPoints(count: number = 10): Point[] {
     const points: Point[] = [];
 
@@ -41,8 +40,6 @@ function generateRandomPoints(count: number = 10): Point[] {
     return points.sort((a, b) => a.x - b.x);
 }
 
-
-
 export default function LinearRegression() {
     const { theme } = useTheme();
     const [points, setPoints] = useState<Point[]>([
@@ -54,7 +51,6 @@ export default function LinearRegression() {
     ]);
 
     const { m: targetM, b: targetB, error: totalError } = calcRegression(points);
-
 
     const [currentM, setCurrentM] = useState<number>(targetM);
     const [currentB, setCurrentB] = useState<number>(targetB);
@@ -68,11 +64,8 @@ export default function LinearRegression() {
     const [animSpeed, setAnimSpeed] = useState(40);
     const [showResiduals, setShowResiduals] = useState(true);
 
-
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
     const [hoverIdx] = useState<number | null>(null);
-
 
     const [animationPoints, setAnimationPoints] = useState<Point[]>([]);
     const [currentAnimationStep, setCurrentAnimationStep] = useState(0);
@@ -107,7 +100,6 @@ export default function LinearRegression() {
         return { xmin, xmax, ymin, ymax };
     }, [points, isAnimatingLine, isAnimating]);
 
-
     function dataToPixel(x: number, y: number, width: number, height: number) {
         const { xmin, xmax, ymin, ymax } = getDomain();
         const px = PADDING + ((x - xmin) / (xmax - xmin)) * (width - 2 * PADDING);
@@ -121,7 +113,6 @@ export default function LinearRegression() {
         const y = ymin + ((height - PADDING - py) / (height - 2 * PADDING)) * (ymax - ymin);
         return { x, y };
     }
-
 
     const draw = useCallback(() => {
         const canvas = canvasRef.current;
@@ -186,14 +177,11 @@ export default function LinearRegression() {
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
 
-       
         if (isAnimating && animationPoints.length > 0 && currentAnimationStep > 0) {
-          
-            ctx.strokeStyle = "#10b981"; 
+            ctx.strokeStyle = "#10b981";
             ctx.lineWidth = 2;
             ctx.setLineDash([]);
 
-         
             for (let i = 0; i < currentAnimationStep && i < animationPoints.length - 1; i++) {
                 const p1 = animationPoints[i];
                 const p2 = animationPoints[i + 1];
@@ -206,24 +194,21 @@ export default function LinearRegression() {
                 ctx.stroke();
             }
 
-            
             animationPoints.forEach((p, i) => {
                 if (i <= currentAnimationStep) {
                     const { px, py } = dataToPixel(p.x, p.y, width, height);
                     ctx.beginPath();
-                    ctx.fillStyle = i === currentAnimationStep ? "#f59e0b" : "#10b981"; // Current point in orange
+                    ctx.fillStyle = i === currentAnimationStep ? "#f59e0b" : "#10b981";
                     ctx.arc(px, py, POINT_RADIUS, 0, Math.PI * 2);
                     ctx.fill();
 
-        
                     ctx.fillStyle = theme === "dark" ? "#f3f4f6" : "#111827";
                     ctx.font = "10px sans-serif";
                     ctx.fillText(`(${p.x.toFixed(1)}, ${p.y.toFixed(1)})`, px + 8, py - 8);
                 }
             });
         } else {
-           
-            if (showResiduals) {
+            if (showResiduals || isAnimatingLine) {
                 points.forEach((p) => {
                     const predictedY = currentM * p.x + currentB;
                     const { px: px1, py: py1 } = dataToPixel(p.x, p.y, width, height);
@@ -239,13 +224,67 @@ export default function LinearRegression() {
                 });
             }
 
-           
-            const leftData = pixelToData(PADDING, 0, width, height).x;
-            const rightData = pixelToData(width - PADDING, 0, width, height).x;
-            const yLeft = currentM * leftData + currentB;
-            const yRight = currentM * rightData + currentB;
-            const { px: lpx, py: lpy } = dataToPixel(leftData, yLeft, width, height);
-            const { px: rpx, py: rpy } = dataToPixel(rightData, yRight, width, height);
+            // FIXED: Calculate line endpoints that stay within the visible chart area
+            const { xmin: domainXmin, xmax: domainXmax, ymin: domainYmin, ymax: domainYmax } = getDomain();
+
+            // Calculate where the regression line intersects the visible domain boundaries
+            const getLineEndpoints = () => {
+                // Calculate y values at the domain boundaries
+                const yAtXmin = currentM * domainXmin + currentB;
+                const yAtXmax = currentM * domainXmax + currentB;
+
+                // If both endpoints are within the y-domain, use them directly
+                if (yAtXmin >= domainYmin && yAtXmin <= domainYmax &&
+                    yAtXmax >= domainYmin && yAtXmax <= domainYmax) {
+                    return [
+                        { x: domainXmin, y: yAtXmin },
+                        { x: domainXmax, y: yAtXmax }
+                    ];
+                }
+
+                // Calculate intersection points with the domain boundaries
+                const intersections: Point[] = [];
+
+                // Check intersections with vertical boundaries (x = xmin, x = xmax)
+                [domainXmin, domainXmax].forEach(x => {
+                    const y = currentM * x + currentB;
+                    if (y >= domainYmin && y <= domainYmax) {
+                        intersections.push({ x, y });
+                    }
+                });
+
+                // Check intersections with horizontal boundaries (y = ymin, y = ymax)
+                [domainYmin, domainYmax].forEach(y => {
+                    const x = (y - currentB) / currentM;
+                    if (x >= domainXmin && x <= domainXmax && isFinite(x)) {
+                        intersections.push({ x, y });
+                    }
+                });
+
+                // Remove duplicates and ensure we have exactly 2 points
+                const uniqueIntersections = intersections.filter((point, index, self) =>
+                    index === self.findIndex(p =>
+                        Math.abs(p.x - point.x) < 1e-6 && Math.abs(p.y - point.y) < 1e-6
+                    )
+                );
+
+                if (uniqueIntersections.length >= 2) {
+                    // Sort by x and take the two extreme points
+                    uniqueIntersections.sort((a, b) => a.x - b.x);
+                    return [uniqueIntersections[0], uniqueIntersections[uniqueIntersections.length - 1]];
+                }
+
+                // Fallback: use domain boundaries
+                return [
+                    { x: domainXmin, y: domainYmin },
+                    { x: domainXmax, y: domainYmax }
+                ];
+            };
+
+            const endpoints = getLineEndpoints();
+            const { px: lpx, py: lpy } = dataToPixel(endpoints[0].x, endpoints[0].y, width, height);
+            const { px: rpx, py: rpy } = dataToPixel(endpoints[1].x, endpoints[1].y, width, height);
+
             ctx.beginPath();
             ctx.strokeStyle = theme === "dark" ? "#ef4444" : "red";
             ctx.lineWidth = 2.5;
@@ -253,7 +292,6 @@ export default function LinearRegression() {
             ctx.lineTo(rpx, rpy);
             ctx.stroke();
 
-           
             points.forEach((p, i) => {
                 const { px, py } = dataToPixel(p.x, p.y, width, height);
                 ctx.beginPath();
@@ -265,7 +303,6 @@ export default function LinearRegression() {
             });
         }
 
-    
         ctx.fillStyle = theme === "dark" ? "#f3f4f6" : "#111827";
         ctx.font = "14px sans-serif";
         ctx.fillText(`y = ${currentM.toFixed(4)} x + ${currentB.toFixed(4)}`, PADDING + 2, 20);
@@ -273,7 +310,6 @@ export default function LinearRegression() {
         ctx.font = "12px sans-serif";
         ctx.fillText(`Total Error (Sum of Squared Residuals): ${totalError.toFixed(4)}`, PADDING + 2, 38);
 
-      
         if (hoverIdx !== null && !isAnimating) {
             const p = points[hoverIdx];
             const { px, py } = dataToPixel(p.x, p.y, width, height);
@@ -322,7 +358,6 @@ export default function LinearRegression() {
         }
     }, [points, currentM, currentB, getDomain, hoverIdx, showResiduals, totalError, theme, isAnimating, animationPoints, currentAnimationStep]);
 
-
     useEffect(() => {
         if (!manualM && !manualB) {
             setCurrentM(targetM);
@@ -330,68 +365,51 @@ export default function LinearRegression() {
         }
     }, [targetM, targetB, manualM, manualB]);
 
-   
     useEffect(() => {
         if (!isAnimatingLine) return;
 
         const randomPoints = generateRandomPoints(10);
         const { m: finalM, b: finalB } = calcRegression(randomPoints);
 
-        setAnimationPoints([]); // start empty, reveal gradually
-        setShowResiduals(false);
+        setAnimationPoints(randomPoints);
         setIsAnimating(true);
+        setShowResiduals(false);
+        setCurrentAnimationStep(0);
 
-        const pointDelay = 300; // ms between each point appearing
-        const totalDuration = 4000 - animSpeed * 25; // overall duration (faster with slider)
-        const lineStartDelay = randomPoints.length * pointDelay + 500;
+        const totalDuration = 3000 - animSpeed * 20;
+        const start = performance.now();
 
-        // --- 1️⃣ Stage 1: Add points one by one ---
-        randomPoints.forEach((p, i) => {
-            setTimeout(() => {
-                setAnimationPoints((prev) => [...prev, p]);
-            }, i * pointDelay);
-        });
+        const animate = (time: number) => {
+            const elapsed = time - start;
+            const progress = Math.min(1, elapsed / totalDuration);
 
-        // --- 2️⃣ Stage 2: Animate regression line after all points appear ---
-        setTimeout(() => {
-            const start = performance.now();
+            const segment = progress * (randomPoints.length - 1);
 
-            const animateLine = (t: number) => {
-                const progress = Math.min(1, (t - start) / totalDuration);
-                const ease = 1 - Math.pow(1 - progress, 3); // smooth ease-out
+            setCurrentAnimationStep(segment);
 
-                // Interpolate slope & intercept
-                setCurrentM(finalM * ease);
-                setCurrentB(finalB * ease);
+            draw();
 
-                draw();
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                setCurrentM(finalM);
+                setCurrentB(finalB);
+                setShowResiduals(true);
+                setTimeout(() => {
+                    setIsAnimating(false);
+                    setIsAnimatingLine(false);
+                    setAnimationPoints([]);
+                }, 800);
+            }
+        };
 
-                if (progress < 1) {
-                    requestAnimationFrame(animateLine);
-                } else {
-                    setCurrentM(finalM);
-                    setCurrentB(finalB);
-
-                    // --- 3️⃣ Stage 3: Show residuals & finalize ---
-                    setTimeout(() => {
-                        setShowResiduals(true);
-                        setIsAnimating(false);
-                        setIsAnimatingLine(false);
-                    }, 500);
-                }
-            };
-
-            requestAnimationFrame(animateLine);
-        }, lineStartDelay);
+        requestAnimationFrame(animate);
     }, [isAnimatingLine, animSpeed]);
-
-
 
     useEffect(() => {
         draw();
     }, [draw]);
 
- 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -399,7 +417,7 @@ export default function LinearRegression() {
         const rect = () => canvas.getBoundingClientRect();
 
         const onMove = (e: MouseEvent) => {
-            if (isAnimating) return; 
+            if (isAnimating) return;
 
             const r = rect();
             const px = e.clientX - r.left;
