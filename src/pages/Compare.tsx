@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "../context/ThemeContext";
+
 import {
     FaChartLine,
     FaBrain,
@@ -46,6 +47,10 @@ export default function Compare() {
     const frameRef = useRef<number>(0);
 
 
+    const [linearProgress, setLinearProgress] = useState(0);
+    const [nnProgress, setNnProgress] = useState(0);
+    const [cnnProgress, setCnnProgress] = useState(0);
+
     const calculateRegression = () => {
         const xs = points.map((p) => p.x);
         const ys = points.map((p) => p.y);
@@ -59,7 +64,6 @@ export default function Compare() {
         const slope = num / den;
         const intercept = meanY - slope * meanX;
 
-        
         const regressionY = xs.map((x) => slope * x + intercept);
         const ssRes = ys.reduce((acc, y, i) => acc + (y - regressionY[i]) ** 2, 0);
         const ssTot = ys.reduce((acc, y) => acc + (y - meanY) ** 2, 0);
@@ -69,6 +73,34 @@ export default function Compare() {
         setCalculations({ slope, intercept, rSquared, mse });
 
         return { slope, intercept, regressionY, xs };
+    };
+
+    const animateLinearRegression = (progress: number) => {
+        const { slope, intercept, xs } = calculateRegression();
+        const animatedPoints = xs.map(x => ({
+            x,
+            y: intercept + slope * x
+        }));
+
+        
+        const visibleCount = Math.floor(animatedPoints.length * progress);
+        return animatedPoints.slice(0, visibleCount);
+    };
+
+  
+    const animateActivation = (progress: number) => {
+        return Array.from({ length: 50 }, (_, i) => {
+            const x = (i / 5 - 5) + progress * 2;
+            return progress >= 0.5 ? 1 / (1 + Math.exp(-x)) : 0;
+        });
+    };
+
+    // Slow animation for CNN features
+    const animateFeatures = (progress: number) => {
+        const baseFeatures = [0.2, 0.6, 0.8, 0.5, 0.9];
+        return baseFeatures.map((val, i) =>
+            val * Math.min(1, progress * 2) * (0.8 + 0.4 * Math.sin(progress * Math.PI * 2 + i * 0.5))
+        );
     };
 
     useEffect(() => {
@@ -95,7 +127,7 @@ export default function Compare() {
                     {
                         label: "Regression Line",
                         type: "line",
-                        data: xs.map((x, i) => ({ x, y: regressionY[i] })),
+                        data: [],
                         borderColor: "#10b981",
                         borderWidth: 3,
                         fill: false,
@@ -105,11 +137,7 @@ export default function Compare() {
                     {
                         label: "Error Lines",
                         type: "line",
-                        data: points.flatMap((point) => [
-                            { x: point.x, y: point.y },
-                            { x: point.x, y: slope * point.x + intercept }
-                        ]),
-
+                        data: [],
                         borderColor: "#ef4444",
                         borderWidth: 1,
                         borderDash: [5, 5],
@@ -121,19 +149,22 @@ export default function Compare() {
             options: {
                 responsive: true,
                 animation: {
-                    duration: animationState.linear === 'playing' ? 1000 : 0,
-                    easing: 'easeOutQuart'
+                    duration: 0 
                 },
                 scales: {
                     x: {
                         type: "linear",
                         title: { display: true, text: "X" },
-                        grid: { color: theme === 'dark' ? '#374151' : '#e5e7eb' }
+                        grid: { color: theme === 'dark' ? '#374151' : '#e5e7eb' },
+                        min: 0,
+                        max: 6
                     },
                     y: {
                         type: "linear",
                         title: { display: true, text: "Y" },
-                        grid: { color: theme === 'dark' ? '#374151' : '#e5e7eb' }
+                        grid: { color: theme === 'dark' ? '#374151' : '#e5e7eb' },
+                        min: 0,
+                        max: 6
                     },
                 },
                 plugins: {
@@ -151,15 +182,7 @@ export default function Compare() {
             },
         });
 
-        
-        const animateActivation = (frame: number) => {
-            const progress = (frame % 100) / 100;
-            return Array.from({ length: 50 }, (_, i) => {
-                const x = (i / 5 - 5) + progress * 2;
-                return 1 / (1 + Math.exp(-x));
-            });
-        };
-
+     
         const nnChart = new Chart(ctx2, {
             type: "line",
             data: {
@@ -167,7 +190,7 @@ export default function Compare() {
                 datasets: [
                     {
                         label: "Sigmoid Activation",
-                        data: animateActivation(0),
+                        data: Array(50).fill(0),
                         borderColor: "#f59e0b",
                         borderWidth: 3,
                         fill: false,
@@ -175,9 +198,7 @@ export default function Compare() {
                     },
                     {
                         label: "Tanh Activation",
-                        data: Array.from({ length: 50 }, (_, i) =>
-                            Math.tanh(i / 5 - 5)
-                        ),
+                        data: Array(50).fill(0),
                         borderColor: "#8b5cf6",
                         borderWidth: 2,
                         borderDash: [5, 5],
@@ -186,9 +207,7 @@ export default function Compare() {
                     },
                     {
                         label: "ReLU Activation",
-                        data: Array.from({ length: 50 }, (_, i) =>
-                            Math.max(0, i / 5 - 3)
-                        ),
+                        data: Array(50).fill(0),
                         borderColor: "#ef4444",
                         borderWidth: 2,
                         fill: false,
@@ -198,7 +217,7 @@ export default function Compare() {
             },
             options: {
                 animation: {
-                    duration: animationState.nn === 'playing' ? 50 : 0,
+                    duration: 0
                 },
                 responsive: true,
                 scales: {
@@ -208,20 +227,15 @@ export default function Compare() {
                     },
                     y: {
                         title: { display: true, text: "Activation Output" },
-                        grid: { color: theme === 'dark' ? '#374151' : '#e5e7eb' }
+                        grid: { color: theme === 'dark' ? '#374151' : '#e5e7eb' },
+                        min: -1,
+                        max: 1
                     },
                 },
             },
         });
 
-        
-        const animateFeatures = (frame: number) => {
-            const progress = (frame % 60) / 60;
-            return [0.2, 0.6, 0.8, 0.5, 0.9].map((val, i) =>
-                val * (0.8 + 0.4 * Math.sin(progress * Math.PI * 2 + i * 0.5))
-            );
-        };
-
+      
         const cnnChart = new Chart(ctx3, {
             type: "bar",
             data: {
@@ -229,7 +243,7 @@ export default function Compare() {
                 datasets: [
                     {
                         label: "Feature Strength",
-                        data: animateFeatures(0),
+                        data: [0, 0, 0, 0, 0],
                         backgroundColor: [
                             "#3b82f6",
                             "#60a5fa",
@@ -245,7 +259,7 @@ export default function Compare() {
             options: {
                 responsive: true,
                 animation: {
-                    duration: animationState.cnn === 'playing' ? 100 : 0,
+                    duration: 0
                 },
                 scales: {
                     y: {
@@ -261,25 +275,81 @@ export default function Compare() {
             },
         });
 
-       
+        
         const animate = () => {
             frameRef.current++;
 
-            if (animationState.nn === 'playing') {
-                nnChart.data.datasets[0].data = animateActivation(frameRef.current);
-                nnChart.update('none');
+           
+            if (animationState.linear === 'playing') {
+                setLinearProgress(prev => {
+                    const newProgress = Math.min(1, prev + 0.002);
+
+
+                    
+                    const animatedLine = animateLinearRegression(newProgress);
+                    linearChart.data.datasets[1].data = animatedLine;
+
+                    
+                    const errorLines = points.flatMap((point, index) =>
+                        index < Math.floor(points.length * newProgress)
+                            ? [
+                                { x: point.x, y: point.y },
+                                { x: point.x, y: slope * point.x + intercept }
+                            ]
+                            : []
+                    );
+                    linearChart.data.datasets[2].data = errorLines;
+
+                    linearChart.update('none');
+                    return newProgress;
+                });
             }
 
+            
+            if (animationState.nn === 'playing') {
+                setNnProgress(prev => {
+                    const newProgress = Math.min(1, prev + 0.0015);
+
+
+                    
+                    nnChart.data.datasets[0].data = animateActivation(newProgress);
+
+                  
+                    nnChart.data.datasets[1].data = Array.from({ length: 50 }, (_, i) =>
+                        newProgress >= 0.3 ? Math.tanh(i / 5 - 5) * newProgress : 0
+                    );
+
+                   
+                    nnChart.data.datasets[2].data = Array.from({ length: 50 }, (_, i) =>
+                        newProgress >= 0.6 ? Math.max(0, i / 5 - 3) * newProgress : 0
+                    );
+
+                    nnChart.update('none');
+                    return newProgress;
+                });
+            }
+
+         
             if (animationState.cnn === 'playing') {
-                cnnChart.data.datasets[0].data = animateFeatures(frameRef.current);
-                cnnChart.update('none');
+                setCnnProgress(prev => {
+                    const newProgress = (prev + 0.001) % 1;
+
+                    cnnChart.data.datasets[0].data = animateFeatures(newProgress);
+                    cnnChart.update('none');
+                    return newProgress;
+                });
             }
 
             animationRef.current = requestAnimationFrame(animate);
         };
 
-        if (animationState.nn === 'playing' || animationState.cnn === 'playing') {
+        if (animationState.linear === 'playing' || animationState.nn === 'playing' || animationState.cnn === 'playing') {
             animate();
+        } else {
+            
+            if (animationState.linear === 'paused') setLinearProgress(0);
+            if (animationState.nn === 'paused') setNnProgress(0);
+            if (animationState.cnn === 'paused') setCnnProgress(0);
         }
 
         return () => {
@@ -325,8 +395,8 @@ export default function Compare() {
     return (
         <div
             className={`min-h-screen pt-24 pb-10 transition-all duration-500 ${theme === "dark"
-                    ? "bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white"
-                    : "bg-gradient-to-br from-blue-50 via-white to-indigo-50 text-black"
+                ? "bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white"
+                : "bg-gradient-to-br from-blue-50 via-white to-indigo-50 text-black"
                 }`}
         >
             <div className="max-w-7xl mx-auto px-6">
@@ -335,7 +405,7 @@ export default function Compare() {
                     Model Comparison
                 </h1>
 
-               
+                {/* Controls */}
                 <div className="flex flex-wrap justify-center gap-3 mb-6">
                     <input
                         type="number"
@@ -365,16 +435,20 @@ export default function Compare() {
                     </button>
                 </div>
 
-               
+                
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
                    
                     <div
                         className={`rounded-xl shadow-lg p-4 border transition-all duration-300 ${theme === "dark"
-                                ? "bg-gray-800 border-gray-700"
-                                : "bg-white border-gray-200"
+                            ? "bg-gray-800 border-gray-700"
+                            : "bg-white border-gray-200"
                             } ${activeModel === 'linear' ? 'ring-4 ring-blue-500 scale-105' : ''}`}
                     >
-                        <div className="flex justify-between items-center mb-2">
+                        <div
+                            className={`flex justify-between items-center mb-2 ${theme === "dark" ? "text-white/70" : "text-black/70"
+                                }`}
+                        >
+
                             <h2 className="text-xl font-semibold flex items-center gap-2">
                                 <FaChartLine className="text-blue-500" /> Linear Regression
                             </h2>
@@ -391,25 +465,30 @@ export default function Compare() {
                         <canvas ref={linearChartRef} height={200}></canvas>
 
                        
-                        <div className="mt-4 p-3 bg-gray-700 rounded-lg">
+                        <div
+                            className={`mt-4 p-3 bg-gray-700 rounded-lg ${theme === "dark" ? "text-white/70" : "text-black/70"
+                                }`}
+                        >
+
                             <h3 className="font-semibold flex items-center gap-2 text-blue-300">
                                 <FaCalculator /> Regression Calculations
                             </h3>
-                            <div className="text-xs space-y-1 mt-2">
+                            <div className="text-xs space-y-1 mt-2"> 
+                      
                                 <p>Slope (m): <span className="text-green-400">{calculations.slope.toFixed(3)}</span></p>
                                 <p>Intercept (b): <span className="text-green-400">{calculations.intercept.toFixed(3)}</span></p>
-                                <p>Equation: y = {calculations.slope.toFixed(3)}x + {calculations.intercept.toFixed(3)}</p>
+                                <p>Equation: <span className="text-green-400"> y = {calculations.slope.toFixed(3)}x + {calculations.intercept.toFixed(3)}</span></p>
                                 <p>R²: <span className="text-yellow-400">{calculations.rSquared.toFixed(4)}</span></p>
                                 <p>MSE: <span className="text-red-400">{calculations.mse.toFixed(4)}</span></p>
                             </div>
                         </div>
                     </div>
 
-                  
+                   
                     <div
                         className={`rounded-xl shadow-lg p-4 border transition-all duration-300 ${theme === "dark"
-                                ? "bg-gray-800 border-gray-700"
-                                : "bg-white border-gray-200"
+                            ? "bg-gray-800 border-gray-700"
+                            : "bg-white border-gray-200"
                             } ${activeModel === 'nn' ? 'ring-4 ring-yellow-500 scale-105' : ''}`}
                     >
                         <div className="flex justify-between items-center mb-2">
@@ -443,11 +522,10 @@ export default function Compare() {
                         </div>
                     </div>
 
-                   
                     <div
                         className={`rounded-xl shadow-lg p-4 border transition-all duration-300 ${theme === "dark"
-                                ? "bg-gray-800 border-gray-700"
-                                : "bg-white border-gray-200"
+                            ? "bg-gray-800 border-gray-700"
+                            : "bg-white border-gray-200"
                             } ${activeModel === 'cnn' ? 'ring-4 ring-green-500 scale-105' : ''}`}
                     >
                         <div className="flex justify-between items-center mb-2">
@@ -466,7 +544,7 @@ export default function Compare() {
                         </div>
                         <canvas ref={cnnChartRef} height={200}></canvas>
 
-                        
+                       
                         <div className="mt-4 p-3 bg-gray-700 rounded-lg">
                             <h3 className="font-semibold flex items-center gap-2 text-green-300">
                                 <FaCalculator /> CNN Operations
@@ -482,11 +560,11 @@ export default function Compare() {
                     </div>
                 </div>
 
-                
+               
                 <div className="grid md:grid-cols-3 gap-6">
                     <div className={`rounded-xl p-5 transition-all duration-300 ${theme === "dark"
-                            ? "bg-gray-800 border border-gray-700"
-                            : "bg-white border border-gray-200"
+                        ? "bg-gray-800 border border-gray-700"
+                        : "bg-white border border-gray-200"
                         }`}>
                         <h3 className="text-lg font-semibold text-blue-500 mb-2">Linear Regression</h3>
                         <p className="text-sm mb-3">
@@ -501,8 +579,8 @@ export default function Compare() {
                     </div>
 
                     <div className={`rounded-xl p-5 transition-all duration-300 ${theme === "dark"
-                            ? "bg-gray-800 border border-gray-700"
-                            : "bg-white border border-gray-200"
+                        ? "bg-gray-800 border border-gray-700"
+                        : "bg-white border border-gray-200"
                         }`}>
                         <h3 className="text-lg font-semibold text-yellow-500 mb-2">Neural Network</h3>
                         <p className="text-sm mb-3">
@@ -517,8 +595,8 @@ export default function Compare() {
                     </div>
 
                     <div className={`rounded-xl p-5 transition-all duration-300 ${theme === "dark"
-                            ? "bg-gray-800 border border-gray-700"
-                            : "bg-white border border-gray-200"
+                        ? "bg-gray-800 border border-gray-700"
+                        : "bg-white border border-gray-200"
                         }`}>
                         <h3 className="text-lg font-semibold text-green-500 mb-2">Convolutional Neural Network</h3>
                         <p className="text-sm mb-3">
