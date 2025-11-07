@@ -263,9 +263,9 @@ export default function CNNVisualizer() {
                 return next.map((v) => Number(v));
             });
 
-            await new Promise((r) => setTimeout(r, 600));
+            await new Promise((r) => setTimeout(r, 1200));
             setLayerStatus((s) => ({ ...s, [key]: "done" }));
-            await new Promise((r) => setTimeout(r, 200));
+            await new Promise((r) => setTimeout(r, 600));
         }
 
         setProbs((_) => {
