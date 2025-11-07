@@ -47,9 +47,9 @@ export default function Compare() {
     const frameRef = useRef<number>(0);
 
 
-    const [linearProgress, setLinearProgress] = useState(0);
-    const [nnProgress, setNnProgress] = useState(0);
-    const [cnnProgress, setCnnProgress] = useState(0);
+    const [_linearProgress, setLinearProgress] = useState(0);
+    const [_nnProgress, setNnProgress] = useState(0);
+    const [_cnnProgress, setCnnProgress] = useState(0);
 
     const calculateRegression = () => {
         const xs = points.map((p) => p.x);
