@@ -23,22 +23,22 @@ function calcRegression(points: Point[]) {
     return { m, b, error };
 }
 
-function generateRandomPoints(count: number = 10): Point[] {
-    const points: Point[] = [];
+// function generateRandomPoints(count: number = 10): Point[] {
+//     const points: Point[] = [];
 
-    const slope = (Math.random() * 2 - 1) * 0.9; // -0.9 → +0.9
-    const intercept = 2 + Math.random() * 5;     // 2–7
-    const noise = 1 + Math.random() * 1.5;        // 1–2.5
+//     const slope = (Math.random() * 2 - 1) * 0.9; // -0.9 → +0.9
+//     const intercept = 2 + Math.random() * 5;     // 2–7
+//     const noise = 1 + Math.random() * 1.5;        // 1–2.5
 
-    for (let i = 0; i < count; i++) {
-        const x = 0.5 + (i / (count - 1)) * 5.5;
-        let y = intercept + slope * x + (Math.random() - 0.5) * noise;
-        y = Math.max(0.5, Math.min(9.5, y)); // fully inside 0–10
-        points.push({ x, y });
-    }
+//     for (let i = 0; i < count; i++) {
+//         const x = 0.5 + (i / (count - 1)) * 5.5;
+//         let y = intercept + slope * x + (Math.random() - 0.5) * noise;
+//         y = Math.max(0.5, Math.min(9.5, y)); // fully inside 0–10
+//         points.push({ x, y });
+//     }
 
-    return points.sort((a, b) => a.x - b.x);
-}
+//     return points.sort((a, b) => a.x - b.x);
+// }
 
 export default function LinearRegression() {
     const { theme } = useTheme();
@@ -71,12 +71,7 @@ export default function LinearRegression() {
     const [currentAnimationStep, setCurrentAnimationStep] = useState(0);
 
     const getDomain = useCallback(() => {
-        // Keep fixed ranges during animation
-        if (isAnimatingLine || isAnimating) {
-            return { xmin: 0, xmax: 6, ymin: 0, ymax: 10 };
-        }
-
-        // Normal adaptive scaling for user-added points
+       
         const currentPoints = points;
         if (currentPoints.length === 0) return { xmin: 0, xmax: 10, ymin: 0, ymax: 10 };
 
@@ -98,6 +93,8 @@ export default function LinearRegression() {
         if (Math.abs(ymax - ymin) < 1e-6) ymax = ymin + 5;
 
         return { xmin, xmax, ymin, ymax };
+    
+
     }, [points, isAnimatingLine, isAnimating]);
 
     function dataToPixel(x: number, y: number, width: number, height: number) {
@@ -379,30 +376,37 @@ export default function LinearRegression() {
         if (!isAnimatingLine) return;
 
         let cancel = false;
-        const randomPoints = generateRandomPoints(10);
-        const { m: finalM, b: finalB } = calcRegression(randomPoints);
 
-        setAnimationPoints(randomPoints);
+        
+        const userPoints = [...points];
+        if (userPoints.length < 2) {
+            setIsAnimatingLine(false);
+            alert("Add at least two points to animate regression!");
+            return;
+        }
+
+        const { m: finalM, b: finalB } = calcRegression(userPoints);
+
+        setAnimationPoints(userPoints);
         setIsAnimating(true);
         setShowResiduals(false);
         setCurrentAnimationStep(0);
 
         let currentStep = 0;
-        const totalPoints = randomPoints.length;
+        const totalPoints = userPoints.length;
 
-      
         const getDelay = (speed: number): number => {
-            if (speed <= 1) return 5000;      // 1 → 5 sec
-            if (speed <= 10) return 4000;     // 10 → 4 sec
-            if (speed <= 20) return 4000;     // 20 → 4 sec
-            if (speed <= 25) return 3000;     // 25 → 3 sec
-            if (speed <= 40) return 2000;     // 40 → 2 sec
-            if (speed <= 50) return 2000;     // 50 → 2 sec
-            if (speed <= 60) return 1500;     // 60 → 1.5 sec
-            if (speed <= 75) return 1000;     // 75 → 1 sec
-            if (speed <= 90) return 800;      // 90 → 0.8 sec
-            if (speed <= 100) return 500;     // 100 → 0.5 sec
-            return 1000; 
+            if (speed <= 1) return 5000;
+            if (speed <= 10) return 4000;
+            if (speed <= 20) return 4000;
+            if (speed <= 25) return 3000;
+            if (speed <= 40) return 2000;
+            if (speed <= 50) return 2000;
+            if (speed <= 60) return 1500;
+            if (speed <= 75) return 1000;
+            if (speed <= 90) return 800;
+            if (speed <= 100) return 500;
+            return 1000;
         };
 
         const animateStep = () => {
@@ -413,12 +417,9 @@ export default function LinearRegression() {
 
             if (currentStep < totalPoints - 1) {
                 currentStep++;
-
-                const delay = getDelay(animSpeed); 
-
+                const delay = getDelay(animSpeed);
                 setTimeout(animateStep, delay);
             } else {
-             
                 setTimeout(() => {
                     setCurrentM(finalM);
                     setCurrentB(finalB);
@@ -435,7 +436,8 @@ export default function LinearRegression() {
         return () => {
             cancel = true;
         };
-    }, [isAnimatingLine, animSpeed]);
+    }, [isAnimatingLine, animSpeed, points]);  
+
 
 
 
