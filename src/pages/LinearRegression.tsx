@@ -110,13 +110,18 @@ export default function LinearRegression() {
         const y = ymin + ((height - PADDING - py) / (height - 2 * PADDING)) * (ymax - ymin);
         return { x, y };
     }
-    const calcCurrentError = useCallback(() => {
-        if (!points.length) return 0;
-        return points.reduce((sum, p) => {
-            const pred = currentM * p.x + currentB;
-            return sum + (p.y - pred) ** 2;
-        }, 0);
-    }, [points, currentM, currentB]);
+    const calcCurrentError = useCallback(
+        (m?: number, b?: number) => {
+            if (!points.length) return 0;
+            const mm = m ?? currentM;
+            const bb = b ?? currentB;
+            return points.reduce((sum, p) => {
+                const pred = mm * p.x + bb;
+                return sum + (p.y - pred) ** 2;
+            }, 0);
+        },
+        [points, currentM, currentB]
+    );
 
 
     const draw = useCallback(() => {
@@ -411,7 +416,6 @@ export default function LinearRegression() {
 
         let cancel = false;
 
-
         const userPoints = points
             .filter((p: any) => Number.isFinite(p.x) && Number.isFinite(p.y))
             .map((p: any) => ({ x: p.x, y: p.y }));
@@ -422,8 +426,13 @@ export default function LinearRegression() {
             return;
         }
 
-
+       
         const { m: finalM, b: finalB } = calcRegression(userPoints);
+
+       
+        const startM = finalM * (Math.random() * 0.4 + 0.6);
+        const startB = finalB + (Math.random() - 0.5) * 4;  
+
 
         setAnimationPoints(userPoints);
         setIsAnimating(true);
@@ -447,22 +456,38 @@ export default function LinearRegression() {
             return 1000;
         };
 
+        
         const animateStep = () => {
             if (cancel) return;
 
-            
             const progress = currentStep / (totalPoints - 1);
+            const newM = startM + (finalM - startM) * progress;
+            const newB = startB + (finalB - startB) * progress;
+
+            const currentError = calcCurrentError(newM, newB);
 
            
-            const newM = currentMRef.current + (finalM - currentMRef.current) * progress;
-            const newB = currentBRef.current + (finalB - currentBRef.current) * progress;
-
-
+            currentMRef.current = newM;
+            currentBRef.current = newB;
             setCurrentM(newM);
             setCurrentB(newB);
             setCurrentAnimationStep(currentStep);
 
             draw();
+
+            const canvas = canvasRef.current;
+            if (canvas) {
+                const ctx = canvas.getContext("2d");
+                if (ctx) {
+                    ctx.fillStyle = theme === "dark" ? "#9ca3af" : "#6b7280";
+                    ctx.font = "12px sans-serif";
+                    ctx.fillText(
+                        `Total Error (Sum of Squared Residuals): ${currentError.toFixed(4)}`,
+                        PADDING + 2,
+                        38
+                    );
+                }
+            }
 
             if (currentStep < totalPoints - 1) {
                 currentStep++;
@@ -476,10 +501,16 @@ export default function LinearRegression() {
                     setIsAnimating(false);
                     setIsAnimatingLine(false);
                     setAnimationPoints([]);
-                }, 1000);
+                }, 800);
             }
-        };
 
+            console.log(
+                "Frame:", currentStep,
+                "| M:", newM.toFixed(3),
+                "| B:", newB.toFixed(3),
+                "| Error:", currentError.toFixed(4)
+            );
+        };
 
         animateStep();
 
@@ -487,6 +518,7 @@ export default function LinearRegression() {
             cancel = true;
         };
     }, [isAnimatingLine, animSpeed, points]);
+
 
 
 
