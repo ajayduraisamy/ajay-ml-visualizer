@@ -427,7 +427,7 @@ export default function LinearRegression() {
                     setIsAnimating(false);
                     setIsAnimatingLine(false);
                     setAnimationPoints([]);
-                }, 800);
+                }, 2000);
             }
         };
 
